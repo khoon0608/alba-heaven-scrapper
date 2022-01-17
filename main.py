@@ -7,9 +7,6 @@ from bs4 import BeautifulSoup
 os.system("clear")
 alba_url = "http://www.alba.co.kr"
 
-global number_completed
-number_completed = 0
-
 def find_superbrand_links():
   result = requests.get(alba_url)
   soup = BeautifulSoup(result.text, 'html.parser')
@@ -17,9 +14,6 @@ def find_superbrand_links():
   for company_links in companys_links_list:
     apply_links = company_links.find_all('a',{'class':'brandHover'})
     for apply_link in apply_links:
-      global number_completed
-      print(number_completed)
-      print(apply_link)
       company_url = apply_link['href']
       company_url_result = requests.get(company_url)
       company_url_soup = BeautifulSoup(company_url_result.text, 'html.parser')
@@ -28,7 +22,6 @@ def find_superbrand_links():
       lastpage = find_superbrand_info_lastpage(company_url_soup, company_title)
       jobs_info = find_superbrand_info_container(lastpage, company_url, company_title)
       save_to_file_by_company(jobs_info, company_title)
-      number_completed += 1 
   return 0
 # 1 
 
@@ -86,5 +79,4 @@ def save_to_file_by_company(jobs_info, company):
 
 
 links_list = find_superbrand_links()
-print(number_completed)
 print("END")
