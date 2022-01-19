@@ -14,34 +14,52 @@ alba_url = "http://www.alba.co.kr"
 
 if(os.path.exists("csvfolder")):
   shutil.rmtree("csvfolder")
-if(os.path.exists("empty-csvfolder")):
-  shutil.rmtree("empty-csvfolder")
+if(os.path.exists("zero_count_csvfolder")):
+  shutil.rmtree("zero_count_csvfolder")
 os.mkdir("csvfolder")
-os.mkdir("empty-csvfolder")
+os.mkdir("zero_count_csvfolder")
 # 실행할 때 마다 폴더를 생성, 만약 폴더가 있다면 지우고 생성
 
 global index
 global zero_info_companies
-zero_info_company = []
+zero_info_companies = []
 
-def find_superbrand_links():
+
+def find_superbrand_scrap():
   result = requests.get(alba_url)
   soup = BeautifulSoup(result.text, 'html.parser')
   companys_links_list = soup.select('div#MainSuperBrand > ul.goodsBox > li.impact')
+  companies_list=[]
   for company_links in companys_links_list:
+    companies_list.append(companys_links_list)
     apply_links = company_links.find_all('a',{'class':'brandHover'})
     for apply_link in apply_links:
-      company_url = apply_link['href']
-      company_url_result = requests.get(company_url)
-      company_url_soup = BeautifulSoup(company_url_result.text, 'html.parser')
-      company_title = apply_link.select_one('span.company > strong').string.replace("/","")
-      lastpage = find_superbrand_info_lastpage(company_url_soup, company_title)
-      print("\n", "-" * 7, f"START {company_title}", "-" * 7, "\n")
-      jobs_info = find_superbrand_info_container(lastpage, company_url, company_title)
-      save_to_file_by_company(jobs_info, company_title, company_url)
-      print("\n", "-" * 7, f"END {company_title}", "-" * 7, "\n")
+      take_and_save_jobs_info(apply_link)
 
-def find_superbrand_info_lastpage(soup, company_title):
+  return 0
+      
+
+def take_and_save_jobs_info(apply_link):
+  company_url = apply_link['href']
+  company_url_result = requests.get(company_url)
+  company_url_soup = BeautifulSoup(company_url_result.text, 'html.parser')
+  company_title = apply_link.select_one('span.company > strong').string.replace("/","")
+  lastpage = find_superbrand_info_lastpage(company_url_soup)
+  if (lastpage == 0):
+    jobs_info = []
+    save_to_file_by_company(jobs_info, company_title, company_url)
+    print("\n", f"|{company_title} 0건이므로 스크랩 제외|", "\n")
+  else:
+    print("\n", f"[START {company_title}]", "\n")
+    jobs_info = find_superbrand_info(lastpage, company_url, company_title)
+    save_to_file_by_company(jobs_info, company_title, company_url)
+    print("\n", f"[END {company_title}]", "\n")
+  return 0
+
+
+
+
+def find_superbrand_info_lastpage(soup):
   job_count = soup.select_one('div#NormalInfo > p.jobCount > strong')
   if (job_count):
     count = int(job_count.string.replace(",",""))
@@ -67,7 +85,7 @@ def find_info(container):
     "date" : date_info
   }
 
-def find_superbrand_info_container(lastpage, main_url, company_title):
+def find_superbrand_info(lastpage, main_url, company_title):
   jobs_info=[];
   for page in range(lastpage):
     if(main_url[7:10] == "www"):
@@ -78,6 +96,7 @@ def find_superbrand_info_container(lastpage, main_url, company_title):
     print(f'{company_title} {page + 1}page scrapping...')
     soup = BeautifulSoup(result.text, 'html.parser')
     info_containers = soup.select('div#NormalInfo > table > tbody > tr:not(.summaryView)')
+    # 여기에 멀티프로세싱 추가할 것..아마
     for info_container in info_containers:
       job_info = find_info(info_container)
       jobs_info.append(job_info)
@@ -89,20 +108,20 @@ def save_to_file_by_company(jobs_info, company, company_url):
   if(len(jobs_info) == 0):
     global zero_info_companies
     zero_info_companies.append(company)
-    file = open(f'empty-csvfolder/{company}.csv', mode = "w")
+    file = open(f'zero_count_csvfolder/{company}.csv', mode = "w")
     writer = csv.writer(file)
     writer.writerow([company_url])
     writer.writerow([f'{int(now.strftime("%H")) + 9}:{now.strftime("%M")}:{now.strftime("%S")}'])
     writer.writerow([f'{now.strftime("%Y")}-{now.strftime("%m")}-{now.strftime("%d")}'])
     writer.writerow([f'{len(jobs_info)}건'])
-    
   # job_info가 없으면 실행
+  
   else:
     file = open(f'csvfolder/{company}.csv', mode = "w")
     writer = csv.writer(file)
     writer.writerow([f'{int(now.strftime("%H")) + 9}:{now.strftime("%M")}:{now.strftime("%S")}'])
     writer.writerow([f'{now.strftime("%Y")}-{now.strftime("%m")}-{now.strftime("%d")}'])
-    writer.writerow([f"{len(jobs_info)}건"])
+    writer.writerow([f"총 {len(jobs_info)}건"])
     writer.writerow(["index", "place", "title", "time", "pay", "date"])
     global index
     index = 0
@@ -112,15 +131,16 @@ def save_to_file_by_company(jobs_info, company, company_url):
       list_job_info = list(job_info_values)
       list_job_info.insert(0, index)
       writer.writerow(list_job_info)
-  # job_info가 있으면 실행 
+  # job_info가 있으면 실행
+  return 0
 
 
-links_list = find_superbrand_links()
+find_superbrand_scrap()
 # 실행
 if(len(zero_info_companies) != 0):
   for zero_info_company in zero_info_companies:
-    print(f"\n{zero_info_company}는 채용공고가 0건 입니다.\n")
-# 채용공고가 없는 회사가 존재하면 회사이름 출력 
+    print(f"\n{zero_info_company}는 채용정보가 0건 입니다.\n")
+# 채용정보가 없는 회사가 존재하면 회사이름 출력 
 print("END")
 # 종료 
 print(f"소요시간은 { math.ceil((time.time() - start)/60)}분입니다." )
